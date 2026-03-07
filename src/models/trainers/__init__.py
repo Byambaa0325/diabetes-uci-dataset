@@ -2,6 +2,7 @@ import json
 import numpy as np
 import torch
 from datetime import datetime
+from uuid import uuid4
 from pathlib import Path
 
 from src.models.registry import MODEL_REGISTRY
@@ -30,7 +31,7 @@ def run_training(config: dict) -> Path:
         raise ValueError(f"Unknown model '{key}'. Available: {list(MODEL_REGISTRY)}")
 
     entry = MODEL_REGISTRY[key]
-    run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    run_id = f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{uuid4().hex[:6]}"
     run_dir = RUNS_DIR / f"{run_id}_{config.get('name', key)}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -41,7 +42,7 @@ def run_training(config: dict) -> Path:
 
     _save_config(config, run_dir)
     finish_run(wandb_run)
-    print(f"Run saved → {run_dir}")
+    print(f"Run saved: {run_dir}")
     return run_dir
 
 

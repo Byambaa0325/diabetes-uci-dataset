@@ -7,9 +7,8 @@ _DROP_COLS = [
     "patient_nbr",        # patient identifier, no signal
     "weight",             # 97% missing
     "payer_code",         # 40% missing, weak prior relevance
-    "medical_specialty",  # 49% missing, complex to encode naively
-    "diag_1", "diag_2", "diag_3",     # raw ICD codes — handled separately if needed
     "examide", "citoglipton", "troglitazone",  # near-zero prescription rates
+    # diag_1/2/3 and medical_specialty are kept — grouped in features.py
 ]
 
 

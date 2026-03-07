@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv:*)",
+      "Bash(python:*)",
+      "Bash(tasklist:*)",
+      "Bash(wmic OS:*)",
+      "Bash(powershell:*)"
+    ]
+  }
+}

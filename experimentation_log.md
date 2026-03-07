@@ -32,6 +32,7 @@ Feature engineering: For the intital set of experiments, we use basic feature en
 
 **Experiment 1:** We train a MLP to classify the dataset. The validation loss is volatile reaching 0.239 at lowest and early threshold would trigger on 0.24. The ROC score
 
+Pipeline: I am refactoring the codebase to be modular in line with FullStackDeepLearning course format and other best practice sources. The new design would allow us to experiment with the baselines faster for ablation and parameter sweeps.
 
 ### References
 

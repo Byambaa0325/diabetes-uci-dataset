@@ -13,6 +13,7 @@ from sklearn.metrics import (
     precision_recall_curve,
     roc_curve,
     f1_score,
+    recall_score,
 )
 
 
@@ -39,8 +40,11 @@ def evaluate(
         title:     Optional label shown on the plot title.
 
     Returns:
-        Dict with keys: roc_auc, threshold, f1, recall, precision,
+        Dict with keys: roc_auc, threshold, f1, recall, recall_lt30, precision,
                         report, confusion_matrix, probs.
+
+                        recall     - macro-averaged recall across both classes.
+                        recall_lt30 - recall for the positive class (<30 days readmitted).
     """
     y_np = y.numpy().astype(int) if isinstance(y, torch.Tensor) else np.asarray(y, dtype=int)
 
@@ -59,7 +63,8 @@ def evaluate(
         "roc_auc":        roc_auc_score(y_np, probs),
         "threshold":      threshold,
         "f1":             f1_score(y_np, preds, zero_division=0),
-        "recall":         _recall(y_np, preds),
+        "recall":         recall_score(y_np, preds, average="macro", zero_division=0),
+        "recall_lt30":    recall_score(y_np, preds, pos_label=1, average="binary", zero_division=0),
         "precision":      _precision(y_np, preds),
         "report":         classification_report(y_np, preds, output_dict=True, zero_division=0),
         "confusion_matrix": confusion_matrix(y_np, preds).tolist(),
@@ -181,11 +186,6 @@ def _predict_proba_sklearn(model, X) -> np.ndarray:
     X_np = X.numpy() if isinstance(X, torch.Tensor) else np.asarray(X)
     return model.predict_proba(X_np)[:, 1]
 
-
-def _recall(y_true, y_pred) -> float:
-    tp = int(((y_pred == 1) & (y_true == 1)).sum())
-    fn = int(((y_pred == 0) & (y_true == 1)).sum())
-    return tp / (tp + fn) if (tp + fn) > 0 else 0.0
 
 
 def _precision(y_true, y_pred) -> float:
