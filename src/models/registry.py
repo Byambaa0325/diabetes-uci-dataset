@@ -7,6 +7,7 @@ To add a new model:
 from src.networks.mlp import MLP
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC
 
 MODEL_REGISTRY: dict[str, dict] = {
     # --- PyTorch ---
@@ -25,6 +26,10 @@ MODEL_REGISTRY: dict[str, dict] = {
     },
     "gradient_boosting": {
         "cls": GradientBoostingClassifier,
+        "framework": "sklearn",
+    },
+    "svm": {
+        "cls": SVC,
         "framework": "sklearn",
     },
 }

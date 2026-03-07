@@ -1,38 +1,194 @@
+from __future__ import annotations
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-from sklearn.metrics import roc_auc_score, classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import seaborn as sns
+from sklearn.metrics import (
+    roc_auc_score,
+    classification_report,
+    confusion_matrix,
+    precision_recall_curve,
+    roc_curve,
+    f1_score,
+)
 
 
-def evaluate(model, X, y) -> dict:
+def evaluate(
+    model,
+    X,
+    y,
+    threshold: float | None = None,
+    plot: bool = False,
+    title: str = "",
+) -> dict:
     """Return evaluation metrics for a binary classifier.
 
-    Accepts either a PyTorch nn.Module or an sklearn estimator.
+    Accepts a PyTorch nn.Module or an sklearn estimator.
     X and y can be torch.Tensors or numpy arrays.
+
+    Args:
+        model:     Fitted model.
+        X:         Feature matrix.
+        y:         True binary labels.
+        threshold: Decision threshold for hard predictions. Defaults to 0.5.
+                   Pass None to use the F1-optimal threshold automatically.
+        plot:      If True, render precision/recall/F1 vs threshold + confusion matrix.
+        title:     Optional label shown on the plot title.
+
+    Returns:
+        Dict with keys: roc_auc, threshold, f1, recall, precision,
+                        report, confusion_matrix, probs.
     """
     y_np = y.numpy().astype(int) if isinstance(y, torch.Tensor) else np.asarray(y, dtype=int)
 
     if isinstance(model, nn.Module):
-        probs, preds = _predict_torch(model, X)
+        probs = _predict_proba_torch(model, X)
     else:
-        probs, preds = _predict_sklearn(model, X)
+        probs = _predict_proba_sklearn(model, X)
 
-    return {
-        "roc_auc": roc_auc_score(y_np, probs),
-        "report": classification_report(y_np, preds, output_dict=True),
+    # Resolve threshold
+    if threshold is None:
+        threshold = _optimal_f1_threshold(probs, y_np)
+
+    preds = (probs >= threshold).astype(int)
+
+    results = {
+        "roc_auc":        roc_auc_score(y_np, probs),
+        "threshold":      threshold,
+        "f1":             f1_score(y_np, preds, zero_division=0),
+        "recall":         _recall(y_np, preds),
+        "precision":      _precision(y_np, preds),
+        "report":         classification_report(y_np, preds, output_dict=True, zero_division=0),
         "confusion_matrix": confusion_matrix(y_np, preds).tolist(),
+        "probs":          probs,
     }
 
+    if plot:
+        _plot(probs, y_np, results, title)
 
-def _predict_torch(model: nn.Module, X) -> tuple[np.ndarray, np.ndarray]:
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Threshold selection
+# ---------------------------------------------------------------------------
+
+def _optimal_f1_threshold(probs: np.ndarray, y: np.ndarray) -> float:
+    """Return the threshold that maximises F1 on the given set."""
+    precision, recall, thresholds = precision_recall_curve(y, probs)
+    f1_scores = np.where(
+        (precision + recall) == 0, 0,
+        2 * precision * recall / (precision + recall + 1e-9),
+    )
+    return float(thresholds[np.argmax(f1_scores[:-1])])
+
+
+# ---------------------------------------------------------------------------
+# Plotting
+# ---------------------------------------------------------------------------
+
+def _plot(probs: np.ndarray, y: np.ndarray, results: dict, title: str) -> None:
+    sns.set_theme(style="whitegrid", palette="muted")
+    fig, axes = plt.subplots(1, 4, figsize=(20, 4.5))
+
+    _plot_threshold_curve(probs, y, results["threshold"], axes[0])
+    _plot_pr_curve(probs, y, axes[1])
+    _plot_roc_curve(probs, y, results["roc_auc"], axes[2])
+    _plot_confusion_matrix(results["confusion_matrix"], axes[3])
+
+    label = f" — {title}" if title else ""
+    fig.suptitle(
+        f"Evaluation{label}  |  ROC-AUC {results['roc_auc']:.4f}  "
+        f"|  F1 {results['f1']:.4f}  |  threshold {results['threshold']:.3f}",
+        fontsize=12, y=1.01,
+    )
+    plt.tight_layout()
+    plt.show()
+
+
+def _plot_threshold_curve(probs, y, chosen_threshold, ax):
+    precision, recall, thresholds = precision_recall_curve(y, probs)
+    f1_scores = np.where(
+        (precision[:-1] + recall[:-1]) == 0, 0,
+        2 * precision[:-1] * recall[:-1] / (precision[:-1] + recall[:-1] + 1e-9),
+    )
+
+    ax.plot(thresholds, precision[:-1], label="Precision", linewidth=1.5)
+    ax.plot(thresholds, recall[:-1],    label="Recall",    linewidth=1.5)
+    ax.plot(thresholds, f1_scores,      label="F1",        linewidth=2, color="#C44E52")
+    ax.axvline(chosen_threshold, color="gray", linestyle="--", linewidth=1,
+               label=f"threshold={chosen_threshold:.3f}")
+    ax.set_xlabel("Threshold")
+    ax.set_ylabel("Score")
+    ax.set_title("Precision / Recall / F1 vs Threshold")
+    ax.legend(fontsize=8)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.05)
+    sns.despine(ax=ax)
+
+
+def _plot_pr_curve(probs, y, ax):
+    precision, recall, _ = precision_recall_curve(y, probs)
+    ax.plot(recall, precision, linewidth=2, color="#4C72B0")
+    ax.axhline(y.mean(), color="gray", linestyle="--", linewidth=1,
+               label=f"no-skill ({y.mean():.3f})")
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
+    ax.set_title("Precision–Recall Curve")
+    ax.legend(fontsize=8)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.05)
+    sns.despine(ax=ax)
+
+
+def _plot_roc_curve(probs, y, roc_auc, ax):
+    fpr, tpr, thresholds = roc_curve(y, probs)
+    ax.plot(fpr, tpr, linewidth=2, color="#C44E52", label=f"AUC = {roc_auc:.4f}")
+    ax.plot([0, 1], [0, 1], color="gray", linestyle="--", linewidth=1, label="No skill")
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+    ax.set_title("ROC Curve")
+    ax.legend(fontsize=8)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.05)
+    sns.despine(ax=ax)
+
+
+def _plot_confusion_matrix(cm: list, ax):
+    cm_arr = np.array(cm)
+    sns.heatmap(cm_arr, annot=True, fmt="d", cmap="Blues", ax=ax,
+                xticklabels=["Pred 0", "Pred 1"],
+                yticklabels=["True 0", "True 1"],
+                linewidths=0.5)
+    ax.set_title("Confusion Matrix")
+
+
+# ---------------------------------------------------------------------------
+# Private predict helpers
+# ---------------------------------------------------------------------------
+
+def _predict_proba_torch(model: nn.Module, X) -> np.ndarray:
     X_t = X if isinstance(X, torch.Tensor) else torch.tensor(X, dtype=torch.float32)
     model.eval()
     with torch.no_grad():
-        probs = torch.sigmoid(model(X_t).squeeze()).numpy()
-    return probs, (probs >= 0.5).astype(int)
+        return torch.sigmoid(model(X_t).squeeze()).numpy()
 
 
-def _predict_sklearn(model, X) -> tuple[np.ndarray, np.ndarray]:
+def _predict_proba_sklearn(model, X) -> np.ndarray:
     X_np = X.numpy() if isinstance(X, torch.Tensor) else np.asarray(X)
-    probs = model.predict_proba(X_np)[:, 1]
-    return probs, (probs >= 0.5).astype(int)
+    return model.predict_proba(X_np)[:, 1]
+
+
+def _recall(y_true, y_pred) -> float:
+    tp = int(((y_pred == 1) & (y_true == 1)).sum())
+    fn = int(((y_pred == 0) & (y_true == 1)).sum())
+    return tp / (tp + fn) if (tp + fn) > 0 else 0.0
+
+
+def _precision(y_true, y_pred) -> float:
+    tp = int(((y_pred == 1) & (y_true == 1)).sum())
+    fp = int(((y_pred == 1) & (y_true == 0)).sum())
+    return tp / (tp + fp) if (tp + fp) > 0 else 0.0
