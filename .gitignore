@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.env
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data (tracked separately or too large)
+dataset/**/*.csv
+dataset/**/*.parquet
+dataset/**/*.xlsx
+
+# Run artefacts
+runs/
+outputs/
+
+# wandb
+wandb/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.code-workspace
