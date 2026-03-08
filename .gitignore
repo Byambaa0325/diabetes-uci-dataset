@@ -32,6 +32,10 @@ Thumbs.db
 # Docs (generated — not committed)
 docs/
 
+# Project notes and AI assistant memory
+PROGRESS.md
+.claude/
+
 # IDEs
 .idea/
 .vscode/

@@ -103,7 +103,7 @@ def build_features(
     df = _encode_specialty(df)
     df = _add_engineered_features(df)
 
-    # Align columns to training set — prevents mismatch when rare categories
+    # Align columns to training set ï¿½ prevents mismatch when rare categories
     # only appear in one split (e.g. during cross-validation folds).
     if columns is not None:
         df = df.reindex(columns=columns, fill_value=0)
@@ -156,7 +156,9 @@ def _encode_clinical_context(df: pd.DataFrame) -> pd.DataFrame:
         df = pd.get_dummies(df, columns=["admission_group"], drop_first=True, dtype=np.int8)
         df.drop(columns=["admission_type_id"], inplace=True)
 
-    # Admission source: keep as numeric ordinal (1-25, already reasonably coded)
+    # Admission source: keep as numeric (1-25)
+    # Note: these are categorical codes, not ordinal â€” see features_improved.py
+    # for a corrected grouped encoding.
     if "admission_source_id" in df.columns:
         df["admission_source_id"] = pd.to_numeric(
             df["admission_source_id"], errors="coerce"

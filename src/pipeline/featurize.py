@@ -5,11 +5,13 @@ from sklearn.utils import resample
 
 from src.data.features import build_features
 from src.data.features_basic import build_features_basic
+from src.data.features_improved import build_features_improved
 from src.pipeline.types import DataBundle, FeatureBundle
 
 _FEATURIZERS = {
-    "full":  build_features,
-    "basic": build_features_basic,
+    "full":     build_features,           # original — admission_source_id as numeric
+    "basic":    build_features_basic,     # minimal encoding (~18 features)
+    "improved": build_features_improved,  # grouped admission_source_id one-hot
 }
 
 
