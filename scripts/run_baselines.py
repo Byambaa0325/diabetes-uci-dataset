@@ -76,7 +76,7 @@ for cfg, result in zip(EXPERIMENTS, results):
         "ROC-AUC":   round(m["roc_auc"], 4),
         "F1":        round(m["f1"], 4),
         "Recall":      round(m["recall"], 4),
-        "Recall(<30)": round(m["recall_lt30"], 4),
+        "Recall(<30)": round(m["recall_pos"], 4),
         "Precision": round(m["precision"], 4),
         "Threshold": round(m["threshold"], 3),
         "Time(s)":   round(result.elapsed_s, 1),

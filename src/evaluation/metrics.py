@@ -41,11 +41,13 @@ def evaluate(
         title:     Optional label shown on the plot title.
 
     Returns:
-        Dict with keys: roc_auc, threshold, f1, recall, recall_lt30, precision,
+        Dict with keys: roc_auc, threshold, f1, recall, recall_pos, precision,
                         report, confusion_matrix, probs.
 
                         recall     - macro-averaged recall across both classes.
-                        recall_lt30 - recall for the positive class (<30 days readmitted).
+                        recall_pos - recall for the positive class (label=1).
+                                     For tasks 2-4: any readmission (>30 or <30).
+                                     For task 5: early readmission (<30) only.
     """
     y_np = y.numpy().astype(int) if isinstance(y, torch.Tensor) else np.asarray(y, dtype=int)
 
@@ -65,7 +67,7 @@ def evaluate(
         "threshold":      threshold,
         "f1":             f1_score(y_np, preds, zero_division=0),
         "recall":         recall_score(y_np, preds, average="macro", zero_division=0),
-        "recall_lt30":    recall_score(y_np, preds, pos_label=1, average="binary", zero_division=0),
+        "recall_pos":     recall_score(y_np, preds, pos_label=1, average="binary", zero_division=0),
         "precision":      _precision(y_np, preds),
         "report":         classification_report(y_np, preds, output_dict=True, zero_division=0),
         "confusion_matrix": confusion_matrix(y_np, preds).tolist(),

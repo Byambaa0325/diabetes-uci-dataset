@@ -25,7 +25,7 @@ from src.pipeline.featurize import stage_featurize
 from src.pipeline.run_train import stage_train
 from src.pipeline.run_evaluate import stage_evaluate
 
-_SCALAR_KEYS = ("roc_auc", "f1", "recall", "recall_lt30", "precision", "threshold")
+_SCALAR_KEYS = ("roc_auc", "f1", "recall", "recall_pos", "precision", "threshold")
 
 
 def cross_validate(

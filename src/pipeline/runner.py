@@ -155,7 +155,7 @@ def _print_result(metrics: dict, test_metrics: dict | None, elapsed: float) -> N
         f"  [val]  ROC-AUC={metrics.get('roc_auc', 0):.4f}  "
         f"F1={metrics.get('f1', 0):.4f}  "
         f"Recall={metrics.get('recall', 0):.4f}  "
-        f"Recall(<30)={metrics.get('recall_lt30', 0):.4f}  "
+        f"Recall(<30)={metrics.get('recall_pos', 0):.4f}  "
         f"({elapsed:.1f}s)"
     )
     print(val_line)
@@ -164,7 +164,7 @@ def _print_result(metrics: dict, test_metrics: dict | None, elapsed: float) -> N
             f"  [test] ROC-AUC={test_metrics.get('roc_auc', 0):.4f}  "
             f"F1={test_metrics.get('f1', 0):.4f}  "
             f"Recall={test_metrics.get('recall', 0):.4f}  "
-            f"Recall(<30)={test_metrics.get('recall_lt30', 0):.4f}"
+            f"Recall(<30)={test_metrics.get('recall_pos', 0):.4f}"
         )
 
 
