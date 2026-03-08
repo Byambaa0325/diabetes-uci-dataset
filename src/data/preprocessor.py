@@ -23,7 +23,7 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def encode_target(df: pd.DataFrame, col: str = "readmitted") -> pd.DataFrame:
-    """Binary encode readmission: <30 → 1, else → 0."""
+    """Binary encode readmission: any readmission (<30 or >30) → 1, NO → 0."""
     df = df.copy()
-    df[col] = (df[col] == "<30").astype(int)
+    df[col] = (df[col] != "NO").astype(int)
     return df

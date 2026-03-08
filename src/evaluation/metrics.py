@@ -24,6 +24,7 @@ def evaluate(
     threshold: float | None = None,
     plot: bool = False,
     title: str = "",
+    predict_batch_size: int | None = None,
 ) -> dict:
     """Return evaluation metrics for a binary classifier.
 
@@ -51,7 +52,7 @@ def evaluate(
     if isinstance(model, nn.Module):
         probs = _predict_proba_torch(model, X)
     else:
-        probs = _predict_proba_sklearn(model, X)
+        probs = _predict_proba_sklearn(model, X, batch_size=predict_batch_size)
 
     # Resolve threshold
     if threshold is None:
@@ -182,9 +183,22 @@ def _predict_proba_torch(model: nn.Module, X) -> np.ndarray:
         return torch.sigmoid(model(X_t).squeeze()).numpy()
 
 
-def _predict_proba_sklearn(model, X) -> np.ndarray:
+def _predict_proba_sklearn(model, X, batch_size: int | None = None) -> np.ndarray:
     X_np = X.numpy() if isinstance(X, torch.Tensor) else np.asarray(X)
-    return model.predict_proba(X_np)[:, 1]
+
+    def _predict_chunk(chunk):
+        if hasattr(model, "predict_proba"):
+            return model.predict_proba(chunk)[:, 1]
+        scores = model.decision_function(chunk)
+        return 1.0 / (1.0 + np.exp(-scores))
+
+    if batch_size is None or len(X_np) <= batch_size:
+        return _predict_chunk(X_np)
+
+    return np.concatenate([
+        _predict_chunk(X_np[i : i + batch_size])
+        for i in range(0, len(X_np), batch_size)
+    ])
 
 
 

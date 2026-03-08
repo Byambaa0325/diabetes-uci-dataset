@@ -19,10 +19,12 @@ class SklearnTrainer(BaseTrainer):
         model = self.model_cls(**(config.get("model_params") or {}))
         model.fit(X_train, y_train)
 
-        log_metrics(wandb_run, {
-            "train_log_loss": log_loss(y_train, model.predict_proba(X_train)[:, 1]),
-            "val_log_loss":   log_loss(y_val,   model.predict_proba(X_val)[:, 1]),
-        }, step=0)
+        if hasattr(model, "predict_proba"):
+            batch = config.get("predict_batch_size")
+            log_metrics(wandb_run, {
+                "train_log_loss": log_loss(y_train, _predict_proba_batched(model, X_train, batch)),
+                "val_log_loss":   log_loss(y_val,   _predict_proba_batched(model, X_val,   batch)),
+            }, step=0)
 
         joblib.dump(model, run_dir / "model.joblib")
         return model
@@ -31,3 +33,12 @@ class SklearnTrainer(BaseTrainer):
 def _to_numpy(x) -> np.ndarray:
     import torch
     return x.numpy() if isinstance(x, torch.Tensor) else np.asarray(x)
+
+
+def _predict_proba_batched(model, X: np.ndarray, batch_size: int | None) -> np.ndarray:
+    if batch_size is None or len(X) <= batch_size:
+        return model.predict_proba(X)[:, 1]
+    return np.concatenate([
+        model.predict_proba(X[i : i + batch_size])[:, 1]
+        for i in range(0, len(X), batch_size)
+    ])

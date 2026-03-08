@@ -36,11 +36,13 @@ def build_features_basic(
     df: pd.DataFrame,
     scaler: StandardScaler | None = None,
     fit_scaler: bool = True,
-) -> tuple[np.ndarray, np.ndarray, StandardScaler]:
-    """Minimal encode and scale. Returns (X, y, scaler).
+    columns: list | None = None,
+) -> tuple[np.ndarray, np.ndarray, StandardScaler, list]:
+    """Minimal encode and scale. Returns (X, y, scaler, columns).
 
     Pass a fitted scaler with fit_scaler=False to transform val/test sets
-    using the same scale as the training set.
+    using the same scale as the training set. Pass columns from the training
+    call to align val/test and prevent feature count mismatches.
     """
     df = df.copy()
 
@@ -68,6 +70,10 @@ def build_features_basic(
     if "race" in df.columns:
         df = pd.get_dummies(df, columns=["race"], drop_first=True, dtype=np.int8)
 
+    # Align columns to training set
+    if columns is not None:
+        df = df.reindex(columns=columns, fill_value=0)
+
     # Scale numeric columns
     num_cols = [c for c in _NUMERIC_COLS if c in df.columns]
     df[num_cols] = df[num_cols].apply(pd.to_numeric, errors="coerce")
@@ -81,4 +87,4 @@ def build_features_basic(
         df[num_cols] = scaler.transform(df[num_cols])
 
     X = df.to_numpy(dtype=np.float32)
-    return X, y, scaler
+    return X, y, scaler, list(df.columns)

@@ -37,7 +37,10 @@ def run_training(config: dict) -> Path:
 
     wandb_run = init_run(config, run_id)
 
-    TrainerClass = _TRAINER_MAP[entry["framework"]]
+    framework = entry["framework"]
+    if framework not in _TRAINER_MAP:
+        raise ValueError(f"Unknown framework '{framework}'. Available: {list(_TRAINER_MAP)}")
+    TrainerClass = _TRAINER_MAP[framework]
     TrainerClass(entry["cls"]).train(config, run_dir, wandb_run)
 
     _save_config(config, run_dir)

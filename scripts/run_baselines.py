@@ -38,6 +38,14 @@ EXPERIMENTS = [
         },
     },
     {
+        "name":         "linear_svm",
+        "model":        "linear_svm",
+        "subsample":    15_000,
+        "model_params": {
+            "C": 1.0, "max_iter": 2000, "class_weight": "balanced",
+        },
+    },
+    {
         "name":         "svm_rbf",
         "model":        "svm",
         "subsample":    15_000,

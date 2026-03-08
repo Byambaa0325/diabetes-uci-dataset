@@ -12,6 +12,7 @@ from src.pipeline.load import stage_load
 from src.pipeline.featurize import stage_featurize
 from src.pipeline.run_train import stage_train
 from src.pipeline.run_evaluate import stage_evaluate
+from src.pipeline.run_test import stage_test
 
 # Keys that affect which DataBundle is produced (stage_load)
 _LOAD_KEYS = frozenset({"split_ratio"})
@@ -20,40 +21,44 @@ _FEATURIZE_KEYS = frozenset({"featurizer", "subsample"})
 
 
 def run_pipeline(config: dict) -> PipelineResult:
-    """Run all four stages in sequence and return a PipelineResult.
+    """Run the full pipeline and return a PipelineResult.
 
-    Stages:
-        load      -> DataBundle
-        featurize -> FeatureBundle
-        train     -> run_dir (Path)
-        evaluate  -> metrics (dict)
+    Behaviour is controlled by config:
+
+        cv_splits (int, default None):
+            None  → single 80/20 holdout split (fast, for iteration).
+            int   → stratified k-fold CV (correct for final evaluation).
+                    metrics dict contains mean values; result.fold_metrics
+                    holds per-fold dicts; result.is_cv is True.
+
+    All other config keys are forwarded to the appropriate stages.
     """
+    cv_splits = config.get("cv_splits")
+    if cv_splits:
+        return _run_cv(config, n_splits=int(cv_splits))
+
     data     = stage_load(config)
     features = stage_featurize(data, config)
     return run_pipeline_from_features(features, config)
 
 
 def run_pipeline_from_features(features: FeatureBundle, config: dict) -> PipelineResult:
-    """Run train + evaluate stages only, using a pre-built FeatureBundle.
+    """Run train + evaluate only, using a pre-built FeatureBundle.
 
     Use this when sweeping model hyperparameters with fixed featurization —
     build the FeatureBundle once and pass it to each config in the sweep.
+    Always performs a single-split evaluation (no CV).
     """
     t0 = time.time()
 
-    run_dir = stage_train(features, config)
-    metrics = stage_evaluate(features, config, run_dir)
+    run_dir      = stage_train(features, config)
+    metrics      = stage_evaluate(features, config, run_dir)
+    test_metrics = stage_test(features, config, run_dir) if features.X_test is not None else None
 
     elapsed = time.time() - t0
     model   = _reload_model(run_dir, config, n_features=features.n_features)
 
-    print(
-        f"  ROC-AUC={metrics.get('roc_auc', 0):.4f}  "
-        f"F1={metrics.get('f1', 0):.4f}  "
-        f"Recall={metrics.get('recall', 0):.4f}  "
-        f"Recall(<30)={metrics.get('recall_lt30', 0):.4f}  "
-        f"({elapsed:.1f}s)"
-    )
+    _print_result(metrics, test_metrics, elapsed)
 
     return PipelineResult(
         run_dir=run_dir,
@@ -61,42 +66,26 @@ def run_pipeline_from_features(features: FeatureBundle, config: dict) -> Pipelin
         metrics=metrics,
         feature_bundle=features,
         elapsed_s=elapsed,
+        test_metrics=test_metrics,
     )
 
 
 def sweep(base_config: dict, param_grid: list[dict]) -> list[PipelineResult]:
     """Run many configs efficiently, reusing precomputed data/features.
 
+    Always uses single-split evaluation. For CV sweeps use cross_validate_sweep.
+
     Groups configs by (split_ratio, featurizer, subsample) so that
     load + featurize is shared across configs that differ only in model
     hyperparameters. Preserves param_grid ordering in the returned list.
-
-    Args:
-        base_config: Shared config applied as defaults to all runs.
-        param_grid:  List of override dicts, one per run.  Each dict is
-                     merged over base_config, so only differing keys need
-                     to be specified.
-
-    Returns:
-        List of PipelineResult in the same order as param_grid.
-
-    Example::
-
-        results = sweep(
-            base_config={"model": "logistic_regression", "featurizer": "full"},
-            param_grid=[{"model_params": {"C": c}} for c in [0.01, 0.1, 1.0, 10.0]],
-        )
     """
     configs = [{**base_config, **overrides} for overrides in param_grid]
 
-    # Group by the keys that determine which (data, features) pair to use.
-    # Sorted key names give a deterministic, hashable signature.
     _stage_keys = sorted(_LOAD_KEYS | _FEATURIZE_KEYS)
 
     def _stage_sig(cfg: dict) -> tuple:
         return tuple(cfg.get(k) for k in _stage_keys)
 
-    # Collect groups while preserving param_grid insertion order.
     groups: dict[tuple, list[tuple[int, dict]]] = defaultdict(list)
     for i, cfg in enumerate(configs):
         groups[_stage_sig(cfg)].append((i, cfg))
@@ -128,6 +117,56 @@ def load_model(config: dict, run_dir: Path):
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+def _run_cv(config: dict, n_splits: int) -> PipelineResult:
+    """Run k-fold CV and return a PipelineResult with fold data."""
+    from src.pipeline.cross_validate import cross_validate
+    t0 = time.time()
+
+    cv_result = cross_validate(config, n_splits=n_splits)
+
+    # Expose mean values under the standard metric keys so downstream code
+    # reading result.metrics['roc_auc'] works without modification.
+    # Std values are available as result.metrics['roc_auc_std'] etc.
+    summary = cv_result["summary"]
+    metrics = {k.replace("_mean", ""): v for k, v in summary.items() if k.endswith("_mean")}
+    metrics.update({k: v for k, v in summary.items() if k.endswith("_std")})
+
+    elapsed = time.time() - t0
+    print(
+        f"  CV({n_splits}-fold)  "
+        f"ROC-AUC={metrics.get('roc_auc', 0):.4f}±{metrics.get('roc_auc_std', 0):.4f}  "
+        f"F1={metrics.get('f1', 0):.4f}±{metrics.get('f1_std', 0):.4f}  "
+        f"({elapsed:.1f}s)"
+    )
+
+    return PipelineResult(
+        run_dir=None,
+        model=None,
+        metrics=metrics,
+        feature_bundle=None,
+        elapsed_s=elapsed,
+        fold_metrics=cv_result["fold_metrics"],
+    )
+
+
+def _print_result(metrics: dict, test_metrics: dict | None, elapsed: float) -> None:
+    val_line = (
+        f"  [val]  ROC-AUC={metrics.get('roc_auc', 0):.4f}  "
+        f"F1={metrics.get('f1', 0):.4f}  "
+        f"Recall={metrics.get('recall', 0):.4f}  "
+        f"Recall(<30)={metrics.get('recall_lt30', 0):.4f}  "
+        f"({elapsed:.1f}s)"
+    )
+    print(val_line)
+    if test_metrics:
+        print(
+            f"  [test] ROC-AUC={test_metrics.get('roc_auc', 0):.4f}  "
+            f"F1={test_metrics.get('f1', 0):.4f}  "
+            f"Recall={test_metrics.get('recall', 0):.4f}  "
+            f"Recall(<30)={test_metrics.get('recall_lt30', 0):.4f}"
+        )
+
 
 def _reload_model(run_dir: Path, config: dict, n_features: int | None = None):
     import torch

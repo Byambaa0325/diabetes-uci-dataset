@@ -82,11 +82,14 @@ def build_features(
     df: pd.DataFrame,
     scaler: StandardScaler | None = None,
     fit_scaler: bool = True,
-) -> tuple[np.ndarray, np.ndarray, StandardScaler]:
-    """Encode and scale features. Returns (X, y, scaler).
+    columns: list | None = None,
+) -> tuple[np.ndarray, np.ndarray, StandardScaler, list]:
+    """Encode and scale features. Returns (X, y, scaler, columns).
 
     Pass a fitted scaler with fit_scaler=False to transform val/test sets
-    using the same scale as the training set.
+    using the same scale as the training set. Pass the columns list returned
+    from the training call to align val/test columns and prevent feature
+    count mismatches from rare get_dummies categories.
     """
     df = df.copy()
 
@@ -99,6 +102,11 @@ def build_features(
     df = _encode_medications(df)
     df = _encode_specialty(df)
     df = _add_engineered_features(df)
+
+    # Align columns to training set — prevents mismatch when rare categories
+    # only appear in one split (e.g. during cross-validation folds).
+    if columns is not None:
+        df = df.reindex(columns=columns, fill_value=0)
 
     # Scale numeric columns
     num_cols = [c for c in _NUMERIC_COLS if c in df.columns]
@@ -113,7 +121,7 @@ def build_features(
         df[num_cols] = scaler.transform(df[num_cols])
 
     X = df.to_numpy(dtype=np.float32)
-    return X, y, scaler
+    return X, y, scaler, list(df.columns)
 
 
 # ---------------------------------------------------------------------------

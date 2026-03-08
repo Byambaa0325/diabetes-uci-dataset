@@ -5,7 +5,12 @@
       "Bash(python:*)",
       "Bash(tasklist:*)",
       "Bash(wmic OS:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(.conda/python.exe:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(nvidia-smi:*)",
+      "Bash(wmic logicaldisk:*)"
     ]
   }
 }
