@@ -17,6 +17,7 @@ venv/
 dataset/**/*.csv
 dataset/**/*.parquet
 dataset/**/*.xlsx
+*.zip
 
 # Run artefacts
 runs/
