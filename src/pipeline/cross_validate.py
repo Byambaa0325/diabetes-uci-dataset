@@ -61,7 +61,7 @@ def cross_validate(
     if cpdir:
         cpdir.mkdir(parents=True, exist_ok=True)
 
-    df = load_full_df()
+    df = load_full_df(target_mode=config.get("target_mode", "any"))
 
     test_ratio = config.get("test_ratio", 0.0)
     if test_ratio > 0:
@@ -118,7 +118,7 @@ def cross_validate_sweep(
         cpdir.mkdir(parents=True, exist_ok=True)
 
     configs = [{**base_config, **overrides} for overrides in param_grid]
-    df = load_full_df()
+    df = load_full_df(target_mode=base_config.get("target_mode", "any"))
 
     test_ratio = base_config.get("test_ratio", 0.0)
     if test_ratio > 0:

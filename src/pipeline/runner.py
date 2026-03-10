@@ -26,7 +26,7 @@ def run_pipeline(config: dict) -> PipelineResult:
     Behaviour is controlled by config:
 
         cv_splits (int, default None):
-            None  → single 80/20 holdout split (fast, for iteration).
+            None  → single 85/15 holdout split (fast, for iteration).
             int   → stratified k-fold CV (correct for final evaluation).
                     metrics dict contains mean values; result.fold_metrics
                     holds per-fold dicts; result.is_cv is True.

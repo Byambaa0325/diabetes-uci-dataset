@@ -26,8 +26,9 @@ class FeatureBundle:
     y_val:      np.ndarray
     n_features: int
     scaler:     object                      # fitted StandardScaler
-    X_test:     Optional[np.ndarray] = field(default=None)
-    y_test:     Optional[np.ndarray] = field(default=None)
+    X_test:       Optional[np.ndarray] = field(default=None)
+    y_test:       Optional[np.ndarray] = field(default=None)
+    feature_names: Optional[list]      = field(default=None)
 
 
 @dataclass

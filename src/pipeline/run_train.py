@@ -9,7 +9,7 @@ from src.models.trainers import run_training
 from src.pipeline.types import FeatureBundle
 
 # Keys consumed by the pipeline that must not be forwarded to run_training
-_PIPELINE_KEYS = {"split_ratio", "test_ratio", "subsample", "featurizer", "threshold", "plot", "cv_splits", "predict_batch_size"}
+_PIPELINE_KEYS = {"split_ratio", "test_ratio", "subsample", "featurizer", "threshold", "plot", "cv_splits", "predict_batch_size", "target_mode", "selected_features"}
 
 
 def stage_train(features: FeatureBundle, config: dict) -> Path:

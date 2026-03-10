@@ -223,7 +223,7 @@ def _encode_specialty(df: pd.DataFrame) -> pd.DataFrame:
     if "medical_specialty" not in df.columns:
         return df
     df["medical_specialty"] = df["medical_specialty"].apply(
-        lambda x: x if (pd.notna(x) and x in _TOP_SPECIALTIES) else "Other"
+        lambda x: x if (pd.notna(x) and x in _TOP_SPECIALTIES) else ("Missing" if pd.isna(x) else "Other")
     )
     df = pd.get_dummies(df, columns=["medical_specialty"], drop_first=True, dtype=np.int8)
     return df

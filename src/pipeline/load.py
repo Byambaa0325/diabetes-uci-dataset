@@ -8,14 +8,17 @@ from src.data.preprocessor import clean, encode_target
 from src.pipeline.types import DataBundle
 
 
-def load_full_df() -> pd.DataFrame:
+def load_full_df(target_mode: str = "any") -> pd.DataFrame:
     """Load, clean, encode target — no split.
 
     Shared by stage_load (single split) and cross_validate (k-fold) so any
     change to loading logic applies to both paths automatically.
+
+    target_mode: 'any'  — any readmission → 1  [Tasks 2-4, default]
+                 'lt30' — <30 days only → 1    [Task 5]
     """
     df_raw, _ = load_raw()
-    return encode_target(clean(df_raw))
+    return encode_target(clean(df_raw), mode=target_mode)
 
 
 def stage_load(config: dict) -> DataBundle:
@@ -33,7 +36,7 @@ def stage_load(config: dict) -> DataBundle:
     split_ratio = config.get("split_ratio", 0.8)
     test_ratio  = config.get("test_ratio", 0.0)
 
-    df = load_full_df()
+    df = load_full_df(target_mode=config.get("target_mode", "any"))
 
     if test_ratio > 0:
         test_cut       = int((1.0 - test_ratio) * len(df))
